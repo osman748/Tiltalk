@@ -1,0 +1,14 @@
+# One-click deploy on Render (free tier): New > Blueprint > pick this repo.
+# The free tier forgets the database on restart, which is fine for a demo.
+services:
+  - type: web
+    name: tilltalk
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 1 --threads 4
+    envVars:
+      - key: TILLTALK_DB
+        value: /tmp/tilltalk.db
+      - key: TILLTALK_ALLOWED_ORIGINS
+        sync: false   # set to your own site URL, e.g. https://tilltalk.onrender.com

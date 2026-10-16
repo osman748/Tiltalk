@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TillTalk</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230e6b5c'/%3E%3Cpath d='M9 11h14M16 11v11' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root { --bg:#faf6ee; --ink:#1d1a14; --mute:#6b6556; --card:#fff; --line:#e6dfce; --accent:#0e6b5c; --accent-ink:#fff; --warn:#a85d00; --bad:#a63a2e; --code:#f3eee0; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14120d; --ink:#f1ecdf; --mute:#a39c88; --card:#1d1a13; --line:#332e22; --accent:#4cc3ad; --accent-ink:#06211c; --warn:#e3a649; --bad:#ee8b7e; --code:#26221a; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+  main { max-width:1000px; margin:0 auto; padding:20px 16px 64px; }
+  h1 { font:700 28px/1.1 Georgia,serif; margin:0; }
+  .sub { color:var(--mute); margin:4px 0 14px; }
+  .grid { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:16px; }
+  .grid > * { min-width:0; }
+  @media (max-width:820px) { .grid { grid-template-columns:minmax(0,1fr); } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+  h2 { font:600 13px/1 ui-sans-serif,system-ui; text-transform:uppercase; letter-spacing:.08em; color:var(--mute); margin:0 0 10px; }
+  #chat { height:340px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding:2px; }
+  .msg { max-width:88%; padding:8px 12px; border-radius:14px; white-space:pre-wrap; word-wrap:break-word; }
+  .me { align-self:flex-end; background:var(--accent); color:var(--accent-ink); border-bottom-right-radius:4px; }
+  .bot { align-self:flex-start; background:var(--code); border-bottom-left-radius:4px; }
+  .bot.err { border:1px solid var(--bad); }
+  .bot.wait { border:1px solid var(--warn); }
+  form { display:flex; gap:8px; margin-top:10px; }
+  input[type=text] { flex:1; min-width:0; padding:11px 12px; border:1px solid var(--line); border-radius:10px; background:transparent; color:var(--ink); font:inherit; }
+  button { font:600 15px inherit; border:0; border-radius:10px; padding:10px 14px; cursor:pointer; background:var(--accent); color:var(--accent-ink); }
+  button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); font-weight:500; font-size:14px; padding:7px 10px; }
+  button.mic.on { background:var(--bad); color:#fff; }
+  button:disabled { opacity:.5; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .row { display:flex; justify-content:space-between; gap:10px; padding:5px 0; border-bottom:1px dashed var(--line); font-size:15px; }
+  .row:last-child { border-bottom:0; }
+  .big { font:700 24px Georgia,serif; }
+  .stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px; }
+  .stat small { display:block; color:var(--mute); font-size:12px; }
+  .good { color:var(--accent); } .bad { color:var(--bad); }
+  details { margin-top:16px; }
+  summary { cursor:pointer; font-weight:600; }
+  pre { margin:8px 0 0; background:var(--code); padding:10px; border-radius:10px; overflow:auto; max-height:260px; font:12px/1.45 ui-monospace,Menlo,Consolas,monospace; white-space:pre-wrap; word-break:break-word; }
+  .tag { display:inline-block; font-size:11px; padding:1px 7px; border-radius:99px; border:1px solid var(--line); color:var(--mute); margin-right:6px; }
+  .foot { color:var(--mute); font-size:13px; margin-top:14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>TillTalk</h1>
+  <p class="sub">A voice ledger for small shops, as an Alexa+ add-on. Say what you sold. Ask who owes you.</p>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Talk to Alexa+ (simulator)</h2>
+      <div id="chat" aria-live="polite"></div>
+      <form id="f">
+        <button type="button" class="mic" id="mic" title="Speak" aria-label="Speak">Mic</button>
+        <input type="text" id="t" placeholder="Sold 3 rice at 12 each to Ama on credit" autocomplete="off" maxlength="300">
+        <button id="go">Send</button>
+      </form>
+      <div class="chips" id="chips"></div>
+      <label class="foot" style="display:block"><input type="checkbox" id="speak"> Read replies aloud</label>
+    </section>
+
+    <section class="card">
+      <h2>The shop's books</h2>
+      <div class="stats">
+        <div class="stat"><small>Sales today</small><div class="big" id="s-sales">-</div></div>
+        <div class="stat"><small>Up / down today</small><div class="big" id="s-profit">-</div></div>
+      </div>
+      <h2 style="margin-top:14px">Who owes you <span id="owed-total"></span></h2>
+      <div id="owes"></div>
+      <h2 style="margin-top:14px">Latest entries</h2>
+      <div id="recent"></div>
+      <p style="margin:12px 0 0;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="ghost" id="seed">Load a sample day</button>
+        <button class="ghost" id="reset">Clear</button>
+      </p>
+    </section>
+  </div>
+
+  <details open>
+    <summary>What is happening underneath (real MCP traffic)</summary>
+    <p class="sub">Each message you send becomes a real JSON-RPC call to <code>/mcp</code> over Streamable HTTP, the same way Alexa+ calls a self-hosted MCP server. The server, not the AI, checks the rules and does the sums.</p>
+    <pre id="trace">Starting…</pre>
+  </details>
+
+  <p class="foot"><span class="tag">simulator</span>The language step here is a small rule-based stand-in for Alexa+. On a real device, Alexa+ understands the speech and calls the same tools.</p>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let rpcId = 0, pendingToken = null, cur = "GHS", version = "2025-11-25";
+const SHOP = (() => { try { let s = localStorage.getItem("tt_shop"); if (!s) { s = "demo-" + Math.random().toString(36).slice(2, 10); localStorage.setItem("tt_shop", s); } return s; } catch (e) { return "demo-session"; } })();
+const H = { "Content-Type": "application/json", "Accept": "application/json, text/event-stream", "X-Shop": SHOP };
+const money = m => `${cur} ${(m / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function say(text, cls) {
+  const d = document.createElement("div");
+  d.className = "msg " + (cls || "bot"); d.textContent = text;
+  $("#chat").appendChild(d); $("#chat").scrollTop = 1e9;
+  if (cls !== "me" && $("#speak").checked && "speechSynthesis" in window) { try { speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance(text)); } catch (e) {} }
+}
+function trace(label, obj) {
+  const el = $("#trace");
+  el.textContent = (el.textContent === "Starting…" ? "" : el.textContent + "\n\n") + label + "\n" + JSON.stringify(obj, null, 2);
+  el.scrollTop = 1e9;
+}
+async function rpc(method, params, notify) {
+  const body = { jsonrpc: "2.0", method, ...(params ? { params } : {}) };
+  if (!notify) body.id = ++rpcId;
+  trace("POST /mcp   (client to server)", body);
+  const r = await fetch("/mcp", { method: "POST", headers: { ...H, "MCP-Protocol-Version": version }, body: JSON.stringify(body) });
+  if (r.status === 202) { trace("HTTP 202 Accepted", {}); return null; }
+  const j = await r.json(); trace("HTTP " + r.status + "   (server to client)", j); return j;
+}
+
+async function handshake() {
+  const init = await rpc("initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "alexa-plus-simulator", version: "1" } });
+  if (init && init.result) version = init.result.protocolVersion;
+  await rpc("notifications/initialized", null, true);
+  await rpc("tools/list", {});
+}
+
+async function handle(text) {
+  say(text, "me");
+  const ir = await (await fetch("/api/interpret", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, has_pending: !!pendingToken }) })).json();
+  if (ir.reply) { say(ir.reply); return; }
+  const args = { ...ir.arguments };
+  if (ir.tool === "confirm" && pendingToken) args.token = pendingToken;
+  const res = await rpc("tools/call", { name: ir.tool, arguments: args });
+  if (!res) return;
+  if (res.error) { say("Sorry, that didn't work: " + res.error.message, "bot err"); return; }
+  const r = res.result, out = r.structuredContent || {};
+  if (r.isError) { say(r.content[0].text, "bot err"); return; }
+  if (out.status === "needs_confirmation") { pendingToken = out.token; say(r.content[0].text, "bot wait"); }
+  else { pendingToken = null; say(r.content[0].text); }
+  refresh();
+}
+
+async function refresh() {
+  try {
+    const j = await (await fetch("/api/ledger", { headers: { "X-Shop": SHOP } })).json();
+    const s = j.summary;
+    $("#s-sales").textContent = money(s.sales_minor);
+    const p = $("#s-profit"); p.textContent = (s.profit_minor < 0 ? "-" : "") + money(Math.abs(s.profit_minor)); p.className = "big " + (s.profit_minor >= 0 ? "good" : "bad");
+    $("#owed-total").textContent = j.owes.total_owed_minor ? "(" + money(j.owes.total_owed_minor) + ")" : "";
+    $("#owes").innerHTML = (j.owes.debtors || []).map(d => `<div class="row"><span>${esc(d.customer)}</span><b>${esc(d.owed)}</b></div>`).join("") || `<div class="sub">Nobody owes you.</div>`;
+    $("#recent").innerHTML = (j.recent.entries || []).map(e => `<div class="row"><span>${esc(e.kind === "sale" ? "Sold " + e.qty + " " + e.item : e.kind === "expense" ? "Spent on " + e.item : e.customer + " paid")}${e.customer && e.kind === "sale" ? " · " + esc(e.customer) : ""}</span><b>${esc(e.total)}</b></div>`).join("") || `<div class="sub">Nothing yet.</div>`;
+  } catch (e) {}
+}
+
+$("#f").addEventListener("submit", async e => {
+  e.preventDefault();
+  const t = $("#t").value.trim(); if (!t) return;
+  $("#t").value = ""; $("#go").disabled = true;
+  try { await handle(t); } catch (err) { say("Something went wrong talking to the server.", "bot err"); }
+  $("#go").disabled = false; $("#t").focus();
+});
+
+const EXAMPLES = ["Sold 3 rice at 12 each to Ama on credit, she'll pay Friday", "Sold 2 sugar for 16", "Spent 15 on transport",
+  "Kofi paid 5", "Who owes me?", "How did I do today?", "Sold 100 bags of cement at 90 each", "Undo that"];
+$("#chips").innerHTML = EXAMPLES.map(x => `<button type="button" class="ghost" data-x="${esc(x)}">${esc(x)}</button>`).join("");
+$("#chips").addEventListener("click", e => { const b = e.target.closest("[data-x]"); if (b) { $("#t").value = b.dataset.x; $("#t").focus(); } });
+
+$("#seed").onclick = async () => { const r = await fetch("/api/demo/seed", { method: "POST", headers: { "X-Shop": SHOP } }); const j = await r.json(); say(j.say || j.error); refresh(); };
+$("#reset").onclick = async () => { await fetch("/api/demo/reset", { method: "POST", headers: { "X-Shop": SHOP } }); pendingToken = null; say("Cleared. Starting fresh."); refresh(); };
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SR) { $("#mic").style.display = "none"; } else {
+  const rec = new SR(); rec.lang = "en-US"; rec.interimResults = false;
+  rec.onresult = ev => { $("#t").value = ev.results[0][0].transcript; $("#f").requestSubmit(); };
+  rec.onend = () => $("#mic").classList.remove("on");
+  rec.onerror = () => $("#mic").classList.remove("on");
+  $("#mic").onclick = () => { try { rec.start(); $("#mic").classList.add("on"); } catch (e) {} };
+}
+
+(async () => {
+  try { const s = await (await fetch("/api/status")).json(); cur = s.currency; if (s.read_only_demo) { $("#seed").style.display = $("#reset").style.display = "none"; } } catch (e) {}
+  say("Hi! Tell me what you sold, spent, or who paid you. Try a chip below, or tap Mic and speak.");
+  try { await handshake(); } catch (e) { trace("handshake failed", { error: String(e) }); }
+  refresh();
+})();
+</script>
+</body>
+</html>
